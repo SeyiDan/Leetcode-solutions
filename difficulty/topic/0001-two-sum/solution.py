@@ -4,9 +4,11 @@ class Solution:
 
         for i in range(len(nums)):
             diff = target - nums[i]
+
             if diff in summ:
-                return [summ[diff], i]
-            summ[nums[i]]=i
-        return summ
+                return [summ[diff], i] 
+            summ[nums[i]] = i
+        return []
+
             
            
