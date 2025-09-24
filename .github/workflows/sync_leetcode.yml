@@ -1,21 +1,45 @@
-name: Sync LeetCode
+name: Safe Sync LeetCode
 
+# Trigger hourly and allow manual runs
 on:
   schedule:
-    - cron: "0  * * *"  # Runs hourly
+    - cron: "0 * * * *"  # Runs at the top of every hour UTC
   workflow_dispatch:
 
 jobs:
   sync:
     runs-on: ubuntu-latest
+
     steps:
+      # Step 1: Checkout repo
       - uses: actions/checkout@v3
 
-      - name: Sync LeetCode submissions
+      # Step 2: Verify secrets exist
+      - name: Check Secrets
+        run: |
+          if [[ -z "${{ secrets.LEETCODE_SESSION }}" ]] || [[ -z "${{ secrets.LEETCODE_CSRF_TOKEN }}" ]]; then
+            echo "❌ LEETCODE_SESSION or csrftoken is missing!"
+            exit 1
+          fi
+          echo "✅ Secrets exist."
+
+      # Step 3: Test LeetCode login
+      - name: Test LeetCode Login
+        run: |
+          response=$(curl -s -H "Cookie: LEETCODE_SESSION=${{ secrets.LEETCODE_SESSION }}; csrftoken=${{ secrets.LEETCODE_CSRF_TOKEN }}" https://leetcode.com/api/problems/algorithms/)
+          if [[ $response == *"stat_status_pairs"* ]]; then
+            echo "✅ Login successful. Proceeding to sync..."
+          else
+            echo "❌ Login failed. Check your cookies."
+            exit 1
+          fi
+
+      # Step 4: Sync LeetCode solutions
+      - name: Sync LeetCode Solutions
         uses: joshcai/leetcode-sync@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           leetcode_session: ${{ secrets.LEETCODE_SESSION }}
           leetcode_csrf_token: ${{ secrets.LEETCODE_CSRF_TOKEN }}
-          folder_structure: "difficulty/topic" 
-          file_extension: "py"                
+          folder_structure: "difficulty/topic"
+          file_extension: "py"
