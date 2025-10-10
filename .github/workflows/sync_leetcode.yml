@@ -35,7 +35,7 @@ jobs:
           fi
 
       - name: Sync LeetCode Solutions
-        uses: SeyiDan/leetcode-sync@main
+        uses: SeyiDan/leetcode-sync@master
         with:
           github-token: ${{ github.token }}
           leetcode-session: ${{ secrets.LEETCODE_SESSION }}
