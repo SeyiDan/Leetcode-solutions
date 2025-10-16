@@ -2,7 +2,7 @@
 # Difficulty: Easy
 # Language: Python3
 # Runtime: 0 ms
-# Submission Date: 2025-05-25
+# Submission Date: 2025-10-16
 
 class Solution:
     def numJewelsInStones(self, jewels: str, stones: str) -> int:
