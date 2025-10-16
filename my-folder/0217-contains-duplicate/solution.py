@@ -1,5 +1,13 @@
 class Solution:
     def containsDuplicate(self, nums: List[int]) -> bool:
+        
+
+
+
+
+
+
+
         numss=set()
 
         for i in nums:
