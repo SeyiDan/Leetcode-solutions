@@ -1,0 +1,54 @@
+name: Test LeetCode Tokens
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Test LeetCode credentials
+        env:
+          LEETCODE_SESSION: ${{ secrets.LEETCODE_SESSION }}
+          LEETCODE_CSRF_TOKEN: ${{ secrets.LEETCODE_CSRF_TOKEN }}
+        run: |
+          python - << 'PY'
+          import os, requests, json
+          sess = requests.Session()
+          sess.cookies.set('LEETCODE_SESSION', os.environ['LEETCODE_SESSION'])
+          sess.cookies.set('csrftoken', os.environ['LEETCODE_CSRF_TOKEN'])
+          headers = {
+              'Content-Type': 'application/json',
+              'X-CSRFToken': os.environ['LEETCODE_CSRF_TOKEN'],
+              'Referer': 'https://leetcode.com/',
+              'User-Agent': 'Mozilla/5.0'
+          }
+          query = """
+          query submissionList($offset: Int!, $limit: Int!) {
+            submissionList(offset: $offset, limit: $limit) {
+              submissions { id title status }
+            }
+          }
+          """
+          r = sess.post('https://leetcode.com/graphql/',
+                        json={'query': query, 'variables': {'offset': 0, 'limit': 1}},
+                        headers=headers, timeout=30)
+          print('Status:', r.status_code)
+          if r.status_code == 200:
+              data = r.json()
+              subs = (data.get('data', {})
+                          .get('submissionList', {})
+                          .get('submissions', []))
+              if subs:
+                  print('OK: Credentials valid, got a submission:', subs[0].get('title'))
+              else:
+                  print('OK: Credentials valid but no submissions returned')
+          else:
+              print('FAIL: Invalid or expired credentials. Body:')
+              print(r.text[:500])
+          PY
