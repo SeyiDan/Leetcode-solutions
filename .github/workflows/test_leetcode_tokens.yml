@@ -12,13 +12,16 @@ jobs:
         with:
           python-version: '3.9'
 
+      - name: Install requests
+        run: pip install requests
+
       - name: Test LeetCode credentials
         env:
           LEETCODE_SESSION: ${{ secrets.LEETCODE_SESSION }}
           LEETCODE_CSRF_TOKEN: ${{ secrets.LEETCODE_CSRF_TOKEN }}
         run: |
           python - << 'PY'
-          import os, requests, json
+          import os, requests
           sess = requests.Session()
           sess.cookies.set('LEETCODE_SESSION', os.environ['LEETCODE_SESSION'])
           sess.cookies.set('csrftoken', os.environ['LEETCODE_CSRF_TOKEN'])
