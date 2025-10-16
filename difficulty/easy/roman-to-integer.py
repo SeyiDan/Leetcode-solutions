@@ -1,24 +1,21 @@
 # Roman to Integer
 # Difficulty: Easy
 # Language: Python3
-# Runtime: 8 ms
-# Submission Date: 2025-04-23
+# Runtime: 4 ms
+# Submission Date: 2025-10-07
 
 class Solution:
     def romanToInt(self, s: str) -> int:
-        d = {'I' :1, 'V' : 5, 'X' : 10, 'L' : 50, 'C' : 100, 'D' : 500, 'M' : 1000}
-        summ = 0
-        n = len(s)
-        i = 0
+        roman_map = {'I':1,'V':5,'X':10,'L':50,'C':100, 'D':500,'M':1000}
+        total = 0
 
-        while  i < n:
-            if i < n-1 and d[s[i]] < d[s[i+1]]:
-                summ += d[s[i+1]] - d[s[i]]
-                i += 2
+        for i in range(len(s)-1):
+            if roman_map[s[i]] <roman_map[s[i+1]]:
+                total-=roman_map[s[i]]
             else:
-                summ += d[s[i]]
-                i+=1
-        return summ
+                total+=roman_map[s[i]]
+        total+=roman_map[s[-1]]
+        return total
 
 
 
@@ -26,30 +23,14 @@ class Solution:
 
 
 
+        # roman_map = {'I':1, 'V':5, 'X':10, 'L':50, 'C':100, 'D':500, 'M':1000}
 
+        # total = 0
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-        summ = 0
-        n = len(s)
-        i = 0
-
-        while i < n:
-            if i < n - 1 and d[s[i]] < d[s[i+1]]:
-                summ = d[s[i+1]] - d[s[i]]
-                i+=2
-            else:
-                summ += d[s[i]]
-                i+=1
-        return summ
+        # for i in range(len(s)-1):
+        #     if roman_map[s[i]] < roman_map[s[i+1]]:
+        #         total-=roman_map[s[i]]
+        #     else:
+        #         total+=roman_map[s[i]]
+        # total+=roman_map[s[-1]]
+        # return total
