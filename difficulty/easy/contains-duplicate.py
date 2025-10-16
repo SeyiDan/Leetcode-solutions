@@ -1,24 +1,17 @@
 # Contains Duplicate
 # Difficulty: Easy
 # Language: Python3
-# Runtime: 13 ms
-# Submission Date: 2025-10-16
+# Runtime: 11 ms
+# Submission Date: 2025-05-06
 
 class Solution:
     def containsDuplicate(self, nums: List[int]) -> bool:
-        
+        seen = set()
 
-
-
-
-
-
-
-        numss=set()
-
-        for i in nums:
-            if i in numss:
+        for num in nums:
+            if num in seen:
                 return True
-            numss.add(i)
-
+            seen.add(num)
         return False
+           
+        
