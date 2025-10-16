@@ -1,21 +1,17 @@
 # Two Sum
 # Difficulty: Easy
 # Language: Python3
-# Runtime: 4 ms
-# Submission Date: 2025-03-07
+# Runtime: 54 ms
+# Submission Date: 2023-10-07
 
 class Solution:
     def twoSum(self, nums: List[int], target: int) -> List[int]:
-        store = {} #Dictionary to store the numbers
+        prevMap = {} #val:index
 
-        #find the two numbers
-        for i in range(len(nums)):
-            complement = target - nums[i]
-            if complement in store:
-                return[store[complement],i]
-
-            store[nums[i]]=i
-        return store
-                
-
+        for i, n in enumerate(nums):
+            diff = target - n
+            if diff in prevMap:
+                return [prevMap[diff],i]
+            prevMap[n] = i
+        return
 
