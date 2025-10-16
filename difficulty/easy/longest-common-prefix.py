@@ -1,7 +1,7 @@
 # Longest Common Prefix
 # Difficulty: Easy
 # Language: Python3
-# Runtime: 0 ms
+# Runtime: 1 ms
 # Submission Date: 2025-10-12
 
 class Solution:
