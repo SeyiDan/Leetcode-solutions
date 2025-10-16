@@ -1,7 +1,7 @@
 # Find Closest Number to Zero
 # Difficulty: Easy
 # Language: Python3
-# Runtime: 7 ms
+# Runtime: 5 ms
 # Submission Date: 2025-10-06
 
 class Solution:
