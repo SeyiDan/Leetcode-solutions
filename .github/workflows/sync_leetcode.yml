@@ -175,14 +175,14 @@ for sub in submissions:
                 if details.get('question') and details['question'].get('difficulty'):
                     difficulty = details['question']['difficulty'].lower()
                 file_path = f"difficulty/{difficulty}/{sub['titleSlug']}{ext}"
-                content = f"""# {sub['title']}
+                content = f\"\"\"# {sub['title']}
 # Difficulty: {difficulty.title()}
 # Language: {sub['langName']}
 # Runtime: {sub.get('runtime', 'N/A')}
 # Submission Date: {datetime.fromtimestamp(int(sub['timestamp'])).strftime('%Y-%m-%d')}
 
 {details['code']}
-"""
+\"\"\"
                 sha = get_github_file_sha('SeyiDan', 'Leetcode-solutions', file_path, github_token)
                 msg = f"Add solution: {sub['title']}" if not sha else f"Update solution: {sub['title']}"
                 if create_or_update_github_file('SeyiDan', 'Leetcode-solutions', file_path, content, msg, github_token, sha):
@@ -195,3 +195,5 @@ for sub in submissions:
 print(f"Completed! Processed {processed} solutions")
 EOF
 
+      - name: Run sync script
+        run: python sync_leetcode.py
