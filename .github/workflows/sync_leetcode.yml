@@ -102,9 +102,9 @@ jobs:
                   'Referer': 'https://leetcode.com/',
                   'User-Agent': 'Mozilla/5.0'
               }
-              backfill = os.environ.get('BACKFILL_MODE', 'false').lower() == 'true'
-              max_pages = int(os.environ.get('MAX_PAGES', '1' if not backfill else '100'))
-              page_size = int(os.environ.get('PAGE_SIZE', '20' if not backfill else '50'))
+              # Force backfill defaults for now
+              max_pages = int(os.environ.get('MAX_PAGES', '100'))
+              page_size = int(os.environ.get('PAGE_SIZE', '50'))
 
               all_subs = []
               for page in range(max_pages):
@@ -119,7 +119,7 @@ jobs:
                       print("No more submissions.")
                       break
                   all_subs.extend(subs)
-                  time.sleep(0.5)  # polite pacing
+                  time.sleep(0.5)
               print(f"Total submissions fetched: {len(all_subs)}")
               return all_subs
 
@@ -171,8 +171,7 @@ jobs:
           processed = 0
           for sub in submissions:
               try:
-                  # 10 = Accepted
-                  if sub.get('status') == 10:
+                  if sub.get('status') == 10:  # Accepted
                       print(f"Processing: {sub['title']}")
                       details = get_submission_details(
                           int(sub['submissionId']),
@@ -209,12 +208,11 @@ jobs:
           print(f"Completed! Processed {processed} solutions")
           EOF
 
-      - name: Run sync script
+      - name: Run sync script (forced backfill)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           LEETCODE_SESSION: ${{ secrets.LEETCODE_SESSION }}
           LEETCODE_CSRF_TOKEN: ${{ secrets.LEETCODE_CSRF_TOKEN }}
-          BACKFILL_MODE: ${{ inputs.backfill_mode || 'false' }}
-          MAX_PAGES: ${{ inputs.max_pages || '1' }}
-          PAGE_SIZE: ${{ inputs.page_size || '20' }}
+          MAX_PAGES: 100
+          PAGE_SIZE: 50
         run: python sync_leetcode.py
