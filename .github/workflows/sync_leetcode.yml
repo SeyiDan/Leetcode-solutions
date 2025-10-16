@@ -53,21 +53,7 @@ jobs:
               response = requests.put(url, json=data, headers=headers)
               return response.status_code in [200, 201]
 
-          def get_leetcode_submissions():
-              session = requests.Session()
-              leetcode_session = os.environ.get('LEETCODE_SESSION', '')
-              csrf_token = os.environ.get('LEETCODE_CSRF_TOKEN', '')
-              if not leetcode_session or not csrf_token:
-                  print("Missing LeetCode credentials")
-                  return []
-              session.cookies.set('LEETCODE_SESSION', leetcode_session)
-              session.cookies.set('csrftoken', csrf_token)
-              headers = {
-                  'Content-Type': 'application/json',
-                  'X-CSRFToken': csrf_token,
-                  'Referer': 'https://leetcode.com/',
-                  'User-Agent': 'Mozilla/5.0'
-              }
+          def fetch_page(session, headers, offset, limit):
               query = """
               query submissionList($offset: Int!, $limit: Int!) {
                 submissionList(offset: $offset, limit: $limit) {
@@ -86,29 +72,56 @@ jobs:
                 }
               }
               """
-              try:
-                  print("Fetching LeetCode submissions...")
-                  response = session.post(
-                      'https://leetcode.com/graphql/',
-                      json={'query': query, 'variables': {'offset': 0, 'limit': 20}},
-                      headers=headers,
-                      timeout=30
-                  )
-                  if response.status_code == 200:
-                      data = response.json()
-                      if data.get('data') and data['data'].get('submissionList'):
-                          submissions = data['data']['submissionList'].get('submissions', [])
-                          print(f"Found {len(submissions)} submissions")
-                          return submissions
-                      else:
-                          print("No submission data found")
-                          return []
-                  else:
-                      print(f"API request failed: {response.status_code}")
-                      return []
-              except Exception as e:
-                  print(f"Error: {str(e)}")
+              resp = session.post(
+                  'https://leetcode.com/graphql/',
+                  json={'query': query, 'variables': {'offset': offset, 'limit': limit}},
+                  headers=headers,
+                  timeout=30
+              )
+              if resp.status_code != 200:
+                  print(f"Fetch failed (offset={offset}): {resp.status_code}")
                   return []
+              data = resp.json()
+              subs = (data.get('data', {})
+                          .get('submissionList', {})
+                          .get('submissions', []))
+              return subs
+
+          def get_leetcode_submissions():
+              session = requests.Session()
+              leetcode_session = os.environ.get('LEETCODE_SESSION', '')
+              csrf_token = os.environ.get('LEETCODE_CSRF_TOKEN', '')
+              if not leetcode_session or not csrf_token:
+                  print("Missing LeetCode credentials")
+                  return []
+              session.cookies.set('LEETCODE_SESSION', leetcode_session)
+              session.cookies.set('csrftoken', csrf_token)
+              headers = {
+                  'Content-Type': 'application/json',
+                  'X-CSRFToken': csrf_token,
+                  'Referer': 'https://leetcode.com/',
+                  'User-Agent': 'Mozilla/5.0'
+              }
+              backfill = os.environ.get('BACKFILL_MODE', 'false').lower() == 'true'
+              max_pages = int(os.environ.get('MAX_PAGES', '1' if not backfill else '100'))
+              page_size = int(os.environ.get('PAGE_SIZE', '20' if not backfill else '50'))
+
+              all_subs = []
+              for page in range(max_pages):
+                  offset = page * page_size
+                  print(f"Fetching page {page+1}/{max_pages} (offset={offset}, size={page_size})...")
+                  try:
+                      subs = fetch_page(session, headers, offset, page_size)
+                  except Exception as e:
+                      print(f"Error fetching page {page+1}: {e}")
+                      break
+                  if not subs:
+                      print("No more submissions.")
+                      break
+                  all_subs.extend(subs)
+                  time.sleep(0.5)  # polite pacing
+              print(f"Total submissions fetched: {len(all_subs)}")
+              return all_subs
 
           def get_submission_details(submission_id, session_cookies, csrf_token):
               session = requests.Session()
@@ -154,11 +167,12 @@ jobs:
           if not submissions:
               print("No submissions found")
               exit(0)
-          week_ago = int(time.time()) - (7 * 24 * 60 * 60)
+
           processed = 0
           for sub in submissions:
               try:
-                  if sub.get('status') == 10 and int(sub.get('timestamp', 0)) > week_ago:
+                  # 10 = Accepted
+                  if sub.get('status') == 10:
                       print(f"Processing: {sub['title']}")
                       details = get_submission_details(
                           int(sub['submissionId']),
@@ -188,7 +202,7 @@ jobs:
                           if create_or_update_github_file('SeyiDan', 'Leetcode-solutions', file_path, content, msg, github_token, sha):
                               print(f"Synced: {sub['title']}")
                               processed += 1
-                      time.sleep(1)
+                      time.sleep(0.5)
               except Exception as e:
                   print(f"Error processing {sub.get('title', 'unknown')}: {str(e)}")
                   continue
@@ -200,4 +214,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           LEETCODE_SESSION: ${{ secrets.LEETCODE_SESSION }}
           LEETCODE_CSRF_TOKEN: ${{ secrets.LEETCODE_CSRF_TOKEN }}
+          BACKFILL_MODE: ${{ inputs.backfill_mode || 'false' }}
+          MAX_PAGES: ${{ inputs.max_pages || '1' }}
+          PAGE_SIZE: ${{ inputs.page_size || '20' }}
         run: python sync_leetcode.py
