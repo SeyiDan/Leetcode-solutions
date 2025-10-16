@@ -174,7 +174,7 @@ jobs:
                           difficulty = 'medium'
                           if details.get('question') and details['question'].get('difficulty'):
                               difficulty = details['question']['difficulty'].lower()
-                          file_path = f\"difficulty/{difficulty}/{sub['titleSlug']}{ext}\"
+                          file_path = f"difficulty/{difficulty}/{sub['titleSlug']}{ext}"
                           content = f\"\"\"# {sub['title']}\n# Difficulty: {difficulty.title()}\n# Language: {sub['langName']}\n# Runtime: {sub.get('runtime', 'N/A')}\n# Submission Date: {datetime.fromtimestamp(int(sub['timestamp'])).strftime('%Y-%m-%d')}\n\n{details['code']}\n\"\"\"
                           sha = get_github_file_sha('SeyiDan', 'Leetcode-solutions', file_path, github_token)
                           msg = f\"Add solution: {sub['title']}\" if not sha else f\"Update solution: {sub['title']}\"
