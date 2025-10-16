@@ -1,12 +1,12 @@
 # Valid Anagram
 # Difficulty: Easy
 # Language: Python3
-# Runtime: 11 ms
+# Runtime: 15 ms
 # Submission Date: 2025-05-08
 
 class Solution:
     def isAnagram(self, s: str, t: str) -> bool:
-        if len(s)!= len(t):
+        if len(t)!= len(s):
             return False
         char_count ={}
 
