@@ -79,6 +79,10 @@ jobs:
                   r = do_call()
               if r.status_code != 200:
                   print(f"Fetch failed (offset={offset}): {r.status_code}")
+                  try:
+                      print('Body:', r.text[:1000])
+                  except Exception:
+                      pass
                   return []
               data = r.json()
               return (data.get('data', {}).get('submissionList', {}).get('submissions', []))
