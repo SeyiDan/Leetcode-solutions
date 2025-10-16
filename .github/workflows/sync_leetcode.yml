@@ -57,7 +57,17 @@ jobs:
               query = """
               query submissionList($offset: Int!, $limit: Int!) {
                 submissionList(offset: $offset, limit: $limit) {
-                  submissions { id title titleSlug status lang langName runtime timestamp submissionId }
+                  submissions {
+                    id
+                    title
+                    titleSlug
+                    status
+                    statusDisplay
+                    lang
+                    langName
+                    runtime
+                    timestamp
+                  }
                 }
               }
               """
@@ -168,7 +178,7 @@ jobs:
                   if sub.get('status') == 10:  # Accepted
                       print(f"Processing: {sub['title']}")
                       details = get_submission_details(
-                          int(sub['submissionId']),
+                          int(sub['id']),
                           os.environ.get('LEETCODE_SESSION'),
                           os.environ.get('LEETCODE_CSRF_TOKEN')
                       )
