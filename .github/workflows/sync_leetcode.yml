@@ -41,17 +41,22 @@ jobs:
                   return response.json().get("sha")
               return None
 
-          def create_or_update_github_file(repo_owner, repo_name, file_path, content, commit_message, token, sha=None, commit_date=None):
+          def create_or_update_github_file(repo_owner, repo_name, file_path, content, commit_message, token, sha=None, commit_date=None, email=None):
               url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/contents/{file_path}"
               data = {
                   "message": commit_message,
                   "content": base64.b64encode(content.encode()).decode(),
+                  "author": {
+                      "name": "SeyiDan",
+                      "email": email or "64979820+SeyiDan@users.noreply.github.com",
+                  },
                   "committer": {
-                      "name": "leetcode-sync",
-                      "email": "actions@github.com",
+                      "name": "SeyiDan",
+                      "email": email or "64979820+SeyiDan@users.noreply.github.com",
                   }
               }
               if commit_date:
+                  data["author"]["date"] = commit_date
                   data["committer"]["date"] = commit_date
               if sha:
                   data["sha"] = sha
@@ -181,6 +186,7 @@ jobs:
               exit(0)
 
           processed = 0
+          github_email = os.environ.get('GITHUB_EMAIL', '64979820+SeyiDan@users.noreply.github.com')
           for sub in submissions:
               try:
                   if sub.get('status') == 10:  # Accepted
@@ -210,12 +216,12 @@ jobs:
                           ]
                           content = "\n".join(header_lines) + "\n\n" + details['code'] + "\n"
 
-                          # Backdated commit using submission timestamp
                           commit_date = iso8601(sub['timestamp'])
                           sha = get_github_file_sha('SeyiDan', 'Leetcode-solutions', file_path, github_token)
                           msg = f"Sync submission: {sub['title']} ({datetime.fromtimestamp(int(sub['timestamp'])).strftime('%Y-%m-%d')})"
-                          if create_or_update_github_file('SeyiDan', 'Leetcode-solutions', file_path, content, msg, github_token, sha, commit_date):
-                              print(f"Committed with date {commit_date}: {sub['title']}")
+
+                          if create_or_update_github_file('SeyiDan', 'Leetcode-solutions', file_path, content, msg, github_token, sha, commit_date, github_email):
+                              print(f"Committed with author date {commit_date}: {sub['title']}")
                               processed += 1
                       time.sleep(0.4)
               except Exception as e:
@@ -227,6 +233,7 @@ jobs:
       - name: Run sync script (forced backfill)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_EMAIL: ${{ secrets.GITHUB_EMAIL }}
           LEETCODE_SESSION: ${{ secrets.LEETCODE_SESSION }}
           LEETCODE_CSRF_TOKEN: ${{ secrets.LEETCODE_CSRF_TOKEN }}
           MAX_PAGES: 100
