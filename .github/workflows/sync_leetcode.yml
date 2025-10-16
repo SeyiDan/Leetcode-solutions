@@ -33,36 +33,10 @@ jobs:
           from datetime import datetime
           import time
 
-          def get_github_file_sha(repo_owner, repo_name, file_path, token):
-              url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/contents/{file_path}"
-              headers = {"Authorization": f"token {token}"}
-              response = requests.get(url, headers=headers)
-              if response.status_code == 200:
-                  return response.json().get("sha")
-              return None
-
-          def create_or_update_github_file(repo_owner, repo_name, file_path, content, commit_message, token, sha=None, commit_date=None, email=None):
-              url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/contents/{file_path}"
-              data = {
-                  "message": commit_message,
-                  "content": base64.b64encode(content.encode()).decode(),
-                  "author": {
-                      "name": "SeyiDan",
-                      "email": email or "64979820+SeyiDan@users.noreply.github.com",
-                  },
-                  "committer": {
-                      "name": "SeyiDan",
-                      "email": email or "64979820+SeyiDan@users.noreply.github.com",
-                  }
-              }
-              if commit_date:
-                  data["author"]["date"] = commit_date
-                  data["committer"]["date"] = commit_date
-              if sha:
-                  data["sha"] = sha
-              headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github.v3+json"}
-              response = requests.put(url, json=data, headers=headers)
-              return response.status_code in [200, 201]
+          def write_file(path, content):
+              os.makedirs(os.path.dirname(path), exist_ok=True)
+              with open(path, 'w', encoding='utf-8') as f:
+                  f.write(content)
 
           def fetch_page(session, csrf_token, offset, limit):
               query = """
@@ -82,22 +56,13 @@ jobs:
                 }
               }
               """
-              def do_call():
-                  return session.post(
-                      'https://leetcode.com/graphql/',
-                      json={'query': query, 'variables': {'offset': offset, 'limit': limit}},
-                      headers={
-                          'Content-Type': 'application/json',
-                          'X-CSRFToken': csrf_token,
-                          'Referer': 'https://leetcode.com/',
-                          'User-Agent': 'Mozilla/5.0'
-                      },
-                      timeout=30
-                  )
-              r = do_call()
-              if r.status_code == 400:
-                  time.sleep(1.0)
-                  r = do_call()
+              headers={
+                  'Content-Type': 'application/json',
+                  'X-CSRFToken': csrf_token,
+                  'Referer': 'https://leetcode.com/',
+                  'User-Agent': 'Mozilla/5.0'
+              }
+              r = session.post('https://leetcode.com/graphql/', json={'query': query, 'variables': {'offset': offset, 'limit': limit}}, headers=headers, timeout=30)
               if r.status_code != 200:
                   print(f"Fetch failed (offset={offset}): {r.status_code}")
                   try:
@@ -117,7 +82,7 @@ jobs:
                   return []
               session.cookies.set('LEETCODE_SESSION', leetcode_session)
               session.cookies.set('csrftoken', csrf_token)
-              time.sleep(1.0)
+              time.sleep(0.5)
 
               max_pages = int(os.environ.get('MAX_PAGES', '100'))
               page_size = int(os.environ.get('PAGE_SIZE', '50'))
@@ -126,16 +91,12 @@ jobs:
               for page in range(max_pages):
                   offset = page * page_size
                   print(f"Fetching page {page+1}/{max_pages} (offset={offset}, size={page_size})...")
-                  try:
-                      subs = fetch_page(session, csrf_token, offset, page_size)
-                  except Exception as e:
-                      print(f"Error fetching page {page+1}: {e}")
-                      break
+                  subs = fetch_page(session, csrf_token, offset, page_size)
                   if not subs:
                       print("No more submissions.")
                       break
                   all_subs.extend(subs)
-                  time.sleep(0.5)
+                  time.sleep(0.2)
               print(f"Total submissions fetched: {len(all_subs)}")
               return all_subs
 
@@ -156,84 +117,72 @@ jobs:
                 }
               }
               """
-              try:
-                  response = session.post(
-                      'https://leetcode.com/graphql/',
-                      json={'query': query, 'variables': {'submissionId': submission_id}},
-                      headers=headers,
-                      timeout=30
-                  )
-                  if response.status_code == 200:
-                      data = response.json()
-                      if data.get('data') and data['data'].get('submissionDetails'):
-                          return data['data']['submissionDetails']
+              r = session.post('https://leetcode.com/graphql/', json={'query': query, 'variables': {'submissionId': submission_id}}, headers=headers, timeout=30)
+              if r.status_code != 200:
                   return None
-              except Exception as e:
-                  print(f"Error fetching code: {str(e)}")
-                  return None
+              data = r.json()
+              return data.get('data', {}).get('submissionDetails')
 
           def iso8601(ts):
               return datetime.fromtimestamp(int(ts)).strftime('%Y-%m-%dT%H:%M:%SZ')
 
           print("Starting LeetCode sync...")
-          github_token = os.environ.get('GITHUB_TOKEN', '')
-          if not github_token:
-              print("Missing GITHUB_TOKEN")
-              exit(1)
           submissions = get_leetcode_submissions()
           if not submissions:
               print("No submissions found")
               exit(0)
 
           processed = 0
-          github_email = os.environ.get('GITHUB_EMAIL', '64979820+SeyiDan@users.noreply.github.com')
           for sub in submissions:
               try:
                   if sub.get('status') == 10:  # Accepted
-                      details = get_submission_details(
-                          int(sub['id']),
-                          os.environ.get('LEETCODE_SESSION'),
-                          os.environ.get('LEETCODE_CSRF_TOKEN')
-                      )
+                      details = get_submission_details(int(sub['id']), os.environ.get('LEETCODE_SESSION'), os.environ.get('LEETCODE_CSRF_TOKEN'))
                       if details and details.get('code'):
-                          exts = {
-                              'python': '.py', 'python3': '.py', 'java': '.java',
-                              'javascript': '.js', 'cpp': '.cpp', 'c': '.c'
-                          }
+                          exts = {'python': '.py','python3': '.py','java': '.java','javascript': '.js','cpp': '.cpp','c': '.c'}
                           ext = exts.get(sub['lang'].lower(), '.txt')
-                          difficulty = 'medium'
-                          if details.get('question') and details['question'].get('difficulty'):
-                              difficulty = details['question']['difficulty'].lower()
+                          difficulty = details.get('question', {}).get('difficulty', 'medium').lower()
                           file_path = f"difficulty/{difficulty}/{sub['titleSlug']}{ext}"
 
-                          # Update header with cumulative practice entries
-                          header_lines = [
+                          header = "\n".join([
                               f"# {sub['title']}",
                               f"# Difficulty: {difficulty.title()}",
                               f"# Language: {sub['langName']}",
                               f"# Runtime: {sub.get('runtime', 'N/A')}",
-                              f"# Submission Date: {datetime.fromtimestamp(int(sub['timestamp'])).strftime('%Y-%m-%d')}",
-                          ]
-                          content = "\n".join(header_lines) + "\n\n" + details['code'] + "\n"
+                              f"# Submission Date: {datetime.fromtimestamp(int(sub['timestamp'])).strftime('%Y-%m-%d')}"
+                          ])
+                          content = header + "\n\n" + details['code'] + "\n"
+                          write_file(file_path, content)
 
-                          commit_date = iso8601(sub['timestamp'])
-                          sha = get_github_file_sha('SeyiDan', 'Leetcode-solutions', file_path, github_token)
-                          msg = f"Sync submission: {sub['title']} ({datetime.fromtimestamp(int(sub['timestamp'])).strftime('%Y-%m-%d')})"
-
-                          if create_or_update_github_file('SeyiDan', 'Leetcode-solutions', file_path, content, msg, github_token, sha, commit_date, github_email):
-                              print(f"Committed with author date {commit_date}: {sub['title']}")
-                              processed += 1
-                      time.sleep(0.4)
+                          # stage, commit with backdated author/committer
+                          os.system(f"git add '{file_path}'")
+                          ts_iso = iso8601(sub['timestamp'])
+                          author = os.environ.get('USER_EMAIL', '')
+                          os.environ['GIT_AUTHOR_DATE'] = ts_iso
+                          os.environ['GIT_COMMITTER_DATE'] = ts_iso
+                          os.system(f"git -c user.name='SeyiDan' -c user.email='{author}' commit -m \"Sync submission: {sub['title']} ({ts_iso[:10]})\" || true")
+                          processed += 1
+                          time.sleep(0.1)
               except Exception as e:
-                  print(f"Error processing {sub.get('title', 'unknown')}: {str(e)}")
+                  print(f"Error processing {sub.get('title','unknown')}: {e}")
                   continue
-          print(f"Completed! Processed {processed} submissions (backdated)")
+          print(f"Completed! Created {processed} backdated commits")
           EOF
+
+      - name: Configure Git identity
+        env:
+          USER_EMAIL: ${{ secrets.USER_EMAIL }}
+        run: |
+          git config --global user.name "SeyiDan"
+          git config --global user.email "${USER_EMAIL}"
+
+      - name: Push commits
+        run: |
+          git status
+          git push origin HEAD:main
 
       - name: Run sync script (forced backfill)
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_EMAIL: ${{ secrets.GITHUB_EMAIL }}
+          USER_EMAIL: ${{ secrets.USER_EMAIL }}
           LEETCODE_SESSION: ${{ secrets.LEETCODE_SESSION }}
           LEETCODE_CSRF_TOKEN: ${{ secrets.LEETCODE_CSRF_TOKEN }}
           MAX_PAGES: 100
