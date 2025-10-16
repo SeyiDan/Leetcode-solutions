@@ -1,7 +1,7 @@
 # Find Closest Number to Zero
 # Difficulty: Easy
 # Language: Python3
-# Runtime: 5 ms
+# Runtime: 11 ms
 # Submission Date: 2025-10-06
 
 class Solution:
@@ -9,7 +9,10 @@ class Solution:
         closest = nums[0]
 
         for x in nums:
-            if abs(x)<abs(closest) or (abs(x)==abs(closest) and x>closest):
+            if abs(x)<abs(closest):
+                closest = x
+
+            if abs(x)==abs(closest) and x>closest:
                 closest = x
 
         return closest
