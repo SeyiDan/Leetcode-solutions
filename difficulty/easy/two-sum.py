@@ -6,7 +6,6 @@
 
 class Solution:
     def twoSum(self, nums: List[int], target: int) -> List[int]:
-    
         store = {} #Dictionary to store the numbers
 
         #find the two numbers
@@ -14,6 +13,7 @@ class Solution:
             complement = target - nums[i]
             if complement in store:
                 return[store[complement],i]
+
             store[nums[i]]=i
         return store
                 
