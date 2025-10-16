@@ -1,31 +1,31 @@
 name: LeetCode Solutions Sync
 
 on:
-  schedule:
-    - cron: '0 */6 * * *'
-  workflow_dispatch:
+schedule:
+  - cron: '0 */6 * * *'
+workflow_dispatch:
 
 jobs:
-  sync:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
+sync:
+  runs-on: ubuntu-latest
+  permissions:
+    contents: write
 
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+  steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.9'
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
 
-      - name: Install Dependencies
-        run: pip install requests
+    - name: Install Dependencies
+      run: pip install requests
 
-      - name: Create Sync Script
-        run: |
-          cat > sync_leetcode.py << 'EOF'
+    - name: Create Sync Script
+      run: |
+        cat > sync_leetcode.py << 'EOF'
 import os
 import requests
 import json
@@ -34,148 +34,148 @@ from datetime import datetime
 import time
 
 def get_github_file_sha(repo_owner, repo_name, file_path, token):
-  url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/contents/{file_path}"
-  headers = {"Authorization": f"token {token}"}
-  response = requests.get(url, headers=headers)
-  if response.status_code == 200:
-      return response.json().get("sha")
-  return None
+url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/contents/{file_path}"
+headers = {"Authorization": f"token {token}"}
+response = requests.get(url, headers=headers)
+if response.status_code == 200:
+    return response.json().get("sha")
+return None
 
 def create_or_update_github_file(repo_owner, repo_name, file_path, content, commit_message, token, sha=None):
-  url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/contents/{file_path}"
-  data = {
-      "message": commit_message,
-      "content": base64.b64encode(content.encode()).decode(),
-  }
-  if sha:
-      data["sha"] = sha
-  headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github.v3+json"}
-  response = requests.put(url, json=data, headers=headers)
-  return response.status_code in [200, 201]
+url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/contents/{file_path}"
+data = {
+    "message": commit_message,
+    "content": base64.b64encode(content.encode()).decode(),
+}
+if sha:
+    data["sha"] = sha
+headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github.v3+json"}
+response = requests.put(url, json=data, headers=headers)
+return response.status_code in [200, 201]
 
 def get_leetcode_submissions():
-  session = requests.Session()
-  leetcode_session = os.environ.get('LEETCODE_SESSION', '')
-  csrf_token = os.environ.get('LEETCODE_CSRF_TOKEN', '')
-  if not leetcode_session or not csrf_token:
-      print("Missing LeetCode credentials")
-      return []
-  session.cookies.set('LEETCODE_SESSION', leetcode_session)
-  session.cookies.set('csrftoken', csrf_token)
-  headers = {
-      'Content-Type': 'application/json',
-      'X-CSRFToken': csrf_token,
-      'Referer': 'https://leetcode.com/',
-      'User-Agent': 'Mozilla/5.0'
-  }
-  query = """
-  query submissionList($offset: Int!, $limit: Int!) {
-    submissionList(offset: $offset, limit: $limit) {
-      submissions {
-        id
-        title
-        titleSlug
-        status
-        statusDisplay
-        lang
-        langName
-        runtime
-        timestamp
-        submissionId
-      }
+session = requests.Session()
+leetcode_session = os.environ.get('LEETCODE_SESSION', '')
+csrf_token = os.environ.get('LEETCODE_CSRF_TOKEN', '')
+if not leetcode_session or not csrf_token:
+    print("Missing LeetCode credentials")
+    return []
+session.cookies.set('LEETCODE_SESSION', leetcode_session)
+session.cookies.set('csrftoken', csrf_token)
+headers = {
+    'Content-Type': 'application/json',
+    'X-CSRFToken': csrf_token,
+    'Referer': 'https://leetcode.com/',
+    'User-Agent': 'Mozilla/5.0'
+}
+query = """
+query submissionList($offset: Int!, $limit: Int!) {
+  submissionList(offset: $offset, limit: $limit) {
+    submissions {
+      id
+      title
+      titleSlug
+      status
+      statusDisplay
+      lang
+      langName
+      runtime
+      timestamp
+      submissionId
     }
   }
-  """
-  try:
-      print("Fetching LeetCode submissions...")
-      response = session.post(
-          'https://leetcode.com/graphql/',
-          json={'query': query, 'variables': {'offset': 0, 'limit': 20}},
-          headers=headers,
-          timeout=30
-      )
-      if response.status_code == 200:
-          data = response.json()
-          if data.get('data') and data['data'].get('submissionList'):
-              submissions = data['data']['submissionList'].get('submissions', [])
-              print(f"Found {len(submissions)} submissions")
-              return submissions
-          else:
-              print("No submission data found")
-              return []
-      else:
-          print(f"API request failed: {response.status_code}")
-          return []
-  except Exception as e:
-      print(f"Error: {str(e)}")
-      return []
+}
+"""
+try:
+    print("Fetching LeetCode submissions...")
+    response = session.post(
+        'https://leetcode.com/graphql/',
+        json={'query': query, 'variables': {'offset': 0, 'limit': 20}},
+        headers=headers,
+        timeout=30
+    )
+    if response.status_code == 200:
+        data = response.json()
+        if data.get('data') and data['data'].get('submissionList'):
+            submissions = data['data']['submissionList'].get('submissions', [])
+            print(f"Found {len(submissions)} submissions")
+            return submissions
+        else:
+            print("No submission data found")
+            return []
+    else:
+        print(f"API request failed: {response.status_code}")
+        return []
+except Exception as e:
+    print(f"Error: {str(e)}")
+    return []
 
 def get_submission_details(submission_id, session_cookies, csrf_token):
-  session = requests.Session()
-  session.cookies.set('LEETCODE_SESSION', session_cookies)
-  session.cookies.set('csrftoken', csrf_token)
-  headers = {
-      'Content-Type': 'application/json',
-      'X-CSRFToken': csrf_token,
-      'Referer': 'https://leetcode.com/'
-  }
-  query = """
-  query submissionDetails($submissionId: Int!) {
-    submissionDetails(submissionId: $submissionId) {
-      code
-      question {
-        difficulty
-      }
+session = requests.Session()
+session.cookies.set('LEETCODE_SESSION', session_cookies)
+session.cookies.set('csrftoken', csrf_token)
+headers = {
+    'Content-Type': 'application/json',
+    'X-CSRFToken': csrf_token,
+    'Referer': 'https://leetcode.com/'
+}
+query = """
+query submissionDetails($submissionId: Int!) {
+  submissionDetails(submissionId: $submissionId) {
+    code
+    question {
+      difficulty
     }
   }
-  """
-  try:
-      response = session.post(
-          'https://leetcode.com/graphql/',
-          json={'query': query, 'variables': {'submissionId': submission_id}},
-          headers=headers,
-          timeout=30
-      )
-      if response.status_code == 200:
-          data = response.json()
-          if data.get('data') and data['data'].get('submissionDetails'):
-              return data['data']['submissionDetails']
-      return None
-  except Exception as e:
-      print(f"Error fetching code: {str(e)}")
-      return None
+}
+"""
+try:
+    response = session.post(
+        'https://leetcode.com/graphql/',
+        json={'query': query, 'variables': {'submissionId': submission_id}},
+        headers=headers,
+        timeout=30
+    )
+    if response.status_code == 200:
+        data = response.json()
+        if data.get('data') and data['data'].get('submissionDetails'):
+            return data['data']['submissionDetails']
+    return None
+except Exception as e:
+    print(f"Error fetching code: {str(e)}")
+    return None
 
 print("Starting LeetCode sync...")
 github_token = os.environ.get('GITHUB_TOKEN', '')
 if not github_token:
-  print("Missing GITHUB_TOKEN")
-  exit(1)
+print("Missing GITHUB_TOKEN")
+exit(1)
 submissions = get_leetcode_submissions()
 if not submissions:
-  print("No submissions found")
-  exit(0)
+print("No submissions found")
+exit(0)
 week_ago = int(time.time()) - (7 * 24 * 60 * 60)
 processed = 0
 for sub in submissions:
-  try:
-      if sub.get('status') == 10 and int(sub.get('timestamp', 0)) > week_ago:
-          print(f"Processing: {sub['title']}")
-          details = get_submission_details(
-              int(sub['submissionId']),
-              os.environ.get('LEETCODE_SESSION'),
-              os.environ.get('LEETCODE_CSRF_TOKEN')
-          )
-          if details and details.get('code'):
-              exts = {
-                  'python': '.py', 'python3': '.py', 'java': '.java',
-                  'javascript': '.js', 'cpp': '.cpp', 'c': '.c'
-              }
-              ext = exts.get(sub['lang'].lower(), '.txt')
-              difficulty = 'medium'
-              if details.get('question') and details['question'].get('difficulty'):
-                  difficulty = details['question']['difficulty'].lower()
-              file_path = f"difficulty/{difficulty}/{sub['titleSlug']}{ext}"
-              content = f"""# {sub['title']}
+try:
+    if sub.get('status') == 10 and int(sub.get('timestamp', 0)) > week_ago:
+        print(f"Processing: {sub['title']}")
+        details = get_submission_details(
+            int(sub['submissionId']),
+            os.environ.get('LEETCODE_SESSION'),
+            os.environ.get('LEETCODE_CSRF_TOKEN')
+        )
+        if details and details.get('code'):
+            exts = {
+                'python': '.py', 'python3': '.py', 'java': '.java',
+                'javascript': '.js', 'cpp': '.cpp', 'c': '.c'
+            }
+            ext = exts.get(sub['lang'].lower(), '.txt')
+            difficulty = 'medium'
+            if details.get('question') and details['question'].get('difficulty'):
+                difficulty = details['question']['difficulty'].lower()
+            file_path = f"difficulty/{difficulty}/{sub['titleSlug']}{ext}"
+            content = f"""# {sub['title']}
 # Difficulty: {difficulty.title()}
 # Language: {sub['langName']}
 # Runtime: {sub.get('runtime', 'N/A')}
@@ -183,21 +183,21 @@ for sub in submissions:
 
 {details['code']}
 """
-              sha = get_github_file_sha('SeyiDan', 'Leetcode-solutions', file_path, github_token)
-              msg = f"Add solution: {sub['title']}" if not sha else f"Update solution: {sub['title']}"
-              if create_or_update_github_file('SeyiDan', 'Leetcode-solutions', file_path, content, msg, github_token, sha):
-                  print(f"Synced: {sub['title']}")
-                  processed += 1
-          time.sleep(1)
-  except Exception as e:
-      print(f"Error processing {sub.get('title', 'unknown')}: {str(e)}")
-      continue
+            sha = get_github_file_sha('SeyiDan', 'Leetcode-solutions', file_path, github_token)
+            msg = f"Add solution: {sub['title']}" if not sha else f"Update solution: {sub['title']}"
+            if create_or_update_github_file('SeyiDan', 'Leetcode-solutions', file_path, content, msg, github_token, sha):
+                print(f"Synced: {sub['title']}")
+                processed += 1
+        time.sleep(1)
+except Exception as e:
+    print(f"Error processing {sub.get('title', 'unknown')}: {str(e)}")
+    continue
 print(f"Completed! Processed {processed} solutions")
 EOF
 
-    - name: Run Sync Script
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        LEETCODE_SESSION: ${{ secrets.LEETCODE_SESSION }}
-        LEETCODE_CSRF_TOKEN: ${{ secrets.LEETCODE_CSRF_TOKEN }}
-      run: python3 sync_leetcode.py
+  - name: Run Sync Script
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      LEETCODE_SESSION: ${{ secrets.LEETCODE_SESSION }}
+      LEETCODE_CSRF_TOKEN: ${{ secrets.LEETCODE_CSRF_TOKEN }}
+    run: python3 sync_leetcode.py
