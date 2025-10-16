@@ -41,12 +41,18 @@ jobs:
                   return response.json().get("sha")
               return None
 
-          def create_or_update_github_file(repo_owner, repo_name, file_path, content, commit_message, token, sha=None):
+          def create_or_update_github_file(repo_owner, repo_name, file_path, content, commit_message, token, sha=None, commit_date=None):
               url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/contents/{file_path}"
               data = {
                   "message": commit_message,
                   "content": base64.b64encode(content.encode()).decode(),
+                  "committer": {
+                      "name": "leetcode-sync",
+                      "email": "actions@github.com",
+                  }
               }
+              if commit_date:
+                  data["committer"]["date"] = commit_date
               if sha:
                   data["sha"] = sha
               headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github.v3+json"}
@@ -106,7 +112,6 @@ jobs:
                   return []
               session.cookies.set('LEETCODE_SESSION', leetcode_session)
               session.cookies.set('csrftoken', csrf_token)
-              # settle before first request
               time.sleep(1.0)
 
               max_pages = int(os.environ.get('MAX_PAGES', '100'))
@@ -162,6 +167,9 @@ jobs:
                   print(f"Error fetching code: {str(e)}")
                   return None
 
+          def iso8601(ts):
+              return datetime.fromtimestamp(int(ts)).strftime('%Y-%m-%dT%H:%M:%SZ')
+
           print("Starting LeetCode sync...")
           github_token = os.environ.get('GITHUB_TOKEN', '')
           if not github_token:
@@ -176,7 +184,6 @@ jobs:
           for sub in submissions:
               try:
                   if sub.get('status') == 10:  # Accepted
-                      print(f"Processing: {sub['title']}")
                       details = get_submission_details(
                           int(sub['id']),
                           os.environ.get('LEETCODE_SESSION'),
@@ -192,24 +199,29 @@ jobs:
                           if details.get('question') and details['question'].get('difficulty'):
                               difficulty = details['question']['difficulty'].lower()
                           file_path = f"difficulty/{difficulty}/{sub['titleSlug']}{ext}"
-                          content = f"""# {sub['title']}
-          # Difficulty: {difficulty.title()}
-          # Language: {sub['langName']}
-          # Runtime: {sub.get('runtime', 'N/A')}
-          # Submission Date: {datetime.fromtimestamp(int(sub['timestamp'])).strftime('%Y-%m-%d')}
 
-          {details['code']}
-          """
+                          # Update header with cumulative practice entries
+                          header_lines = [
+                              f"# {sub['title']}",
+                              f"# Difficulty: {difficulty.title()}",
+                              f"# Language: {sub['langName']}",
+                              f"# Runtime: {sub.get('runtime', 'N/A')}",
+                              f"# Submission Date: {datetime.fromtimestamp(int(sub['timestamp'])).strftime('%Y-%m-%d')}",
+                          ]
+                          content = "\n".join(header_lines) + "\n\n" + details['code'] + "\n"
+
+                          # Backdated commit using submission timestamp
+                          commit_date = iso8601(sub['timestamp'])
                           sha = get_github_file_sha('SeyiDan', 'Leetcode-solutions', file_path, github_token)
-                          msg = f"Add solution: {sub['title']}" if not sha else f"Update solution: {sub['title']}"
-                          if create_or_update_github_file('SeyiDan', 'Leetcode-solutions', file_path, content, msg, github_token, sha):
-                              print(f"Synced: {sub['title']}")
+                          msg = f"Sync submission: {sub['title']} ({datetime.fromtimestamp(int(sub['timestamp'])).strftime('%Y-%m-%d')})"
+                          if create_or_update_github_file('SeyiDan', 'Leetcode-solutions', file_path, content, msg, github_token, sha, commit_date):
+                              print(f"Committed with date {commit_date}: {sub['title']}")
                               processed += 1
-                      time.sleep(0.5)
+                      time.sleep(0.4)
               except Exception as e:
                   print(f"Error processing {sub.get('title', 'unknown')}: {str(e)}")
                   continue
-          print(f"Completed! Processed {processed} solutions")
+          print(f"Completed! Processed {processed} submissions (backdated)")
           EOF
 
       - name: Run sync script (forced backfill)
