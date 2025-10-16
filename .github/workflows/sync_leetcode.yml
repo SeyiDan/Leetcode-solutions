@@ -53,39 +53,35 @@ jobs:
               response = requests.put(url, json=data, headers=headers)
               return response.status_code in [200, 201]
 
-          def fetch_page(session, headers, offset, limit):
+          def fetch_page(session, csrf_token, offset, limit):
               query = """
               query submissionList($offset: Int!, $limit: Int!) {
                 submissionList(offset: $offset, limit: $limit) {
-                  submissions {
-                    id
-                    title
-                    titleSlug
-                    status
-                    statusDisplay
-                    lang
-                    langName
-                    runtime
-                    timestamp
-                    submissionId
-                  }
+                  submissions { id title titleSlug status lang langName runtime timestamp submissionId }
                 }
               }
               """
-              resp = session.post(
-                  'https://leetcode.com/graphql/',
-                  json={'query': query, 'variables': {'offset': offset, 'limit': limit}},
-                  headers=headers,
-                  timeout=30
-              )
-              if resp.status_code != 200:
-                  print(f"Fetch failed (offset={offset}): {resp.status_code}")
+              def do_call():
+                  return session.post(
+                      'https://leetcode.com/graphql/',
+                      json={'query': query, 'variables': {'offset': offset, 'limit': limit}},
+                      headers={
+                          'Content-Type': 'application/json',
+                          'X-CSRFToken': csrf_token,
+                          'Referer': 'https://leetcode.com/',
+                          'User-Agent': 'Mozilla/5.0'
+                      },
+                      timeout=30
+                  )
+              r = do_call()
+              if r.status_code == 400:
+                  time.sleep(1.0)
+                  r = do_call()
+              if r.status_code != 200:
+                  print(f"Fetch failed (offset={offset}): {r.status_code}")
                   return []
-              data = resp.json()
-              subs = (data.get('data', {})
-                          .get('submissionList', {})
-                          .get('submissions', []))
-              return subs
+              data = r.json()
+              return (data.get('data', {}).get('submissionList', {}).get('submissions', []))
 
           def get_leetcode_submissions():
               session = requests.Session()
@@ -96,13 +92,9 @@ jobs:
                   return []
               session.cookies.set('LEETCODE_SESSION', leetcode_session)
               session.cookies.set('csrftoken', csrf_token)
-              headers = {
-                  'Content-Type': 'application/json',
-                  'X-CSRFToken': csrf_token,
-                  'Referer': 'https://leetcode.com/',
-                  'User-Agent': 'Mozilla/5.0'
-              }
-              # Force backfill defaults for now
+              # settle before first request
+              time.sleep(1.0)
+
               max_pages = int(os.environ.get('MAX_PAGES', '100'))
               page_size = int(os.environ.get('PAGE_SIZE', '50'))
 
@@ -111,7 +103,7 @@ jobs:
                   offset = page * page_size
                   print(f"Fetching page {page+1}/{max_pages} (offset={offset}, size={page_size})...")
                   try:
-                      subs = fetch_page(session, headers, offset, page_size)
+                      subs = fetch_page(session, csrf_token, offset, page_size)
                   except Exception as e:
                       print(f"Error fetching page {page+1}: {e}")
                       break
@@ -136,9 +128,7 @@ jobs:
               query submissionDetails($submissionId: Int!) {
                 submissionDetails(submissionId: $submissionId) {
                   code
-                  question {
-                    difficulty
-                  }
+                  question { difficulty }
                 }
               }
               """
