@@ -1,7 +1,7 @@
 # Best Time to Buy and Sell Stock
 # Difficulty: Easy
 # Language: Python3
-# Runtime: 104 ms
+# Runtime: 95 ms
 # Submission Date: 2025-10-08
 
 class Solution:
