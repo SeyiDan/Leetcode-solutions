@@ -1,7 +1,7 @@
 # Two Sum
 # Difficulty: Easy
 # Language: Python3
-# Runtime: 0 ms
+# Runtime: 3 ms
 # Submission Date: 2025-03-07
 
 class Solution:
