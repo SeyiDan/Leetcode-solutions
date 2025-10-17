@@ -1,26 +1,88 @@
 class Solution:
     def isAnagram(self, s: str, t: str) -> bool:
+        # Critical: anagrams must have identical lengths
         if len(s)!= len(t):
             return False
-        
-        letter = {}
-        for i in s:
-            if i in letter:
-                letter[i]+=1
+        letter_count = {}
+
+        for ch in s:
+            if ch in letter_count:
+                letter_count[ch]+=1
             else:
-                letter[i]=1
+                letter_count[ch]=1
 
-        for i in t:
-            if i not in letter:
-                return False
-            letter[i]-=1
-
-            if letter[i]<0:
-                return False
-            
-        for count in letter.values():
-            if count!=0:
+        for ch in t:
+            if ch in letter_count and letter_count[ch]>0:
+                letter_count[ch]-=1
+            else:
                 return False
         return True
-            
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        # if len(s) != len(t):
+        #     return False
+        
+        # letter_count = {}
+        
+        # for ch in s:
+        #     if ch in letter_count:
+        #         letter_count[ch] += 1
+        #     else:
+        #         letter_count[ch] = 1
+        
+        # for ch in t:
+        #     if ch in letter_count and letter_count[ch] > 0:
+        #         letter_count[ch] -= 1
+        #     else:
+        #         return False
+        
+        # return True
 
