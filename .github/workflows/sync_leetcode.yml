@@ -1,190 +1,22 @@
-name: LeetCode Solutions Sync
+name: Sync Leetcode
 
 on:
-  schedule:
-    - cron: '0 */6 * * *'
   workflow_dispatch:
+  schedule:
+    - cron: "30 */1 * * *"
+
 
 jobs:
-  sync:
+  build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
 
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v4
+      - name: Sync
+        uses: joshcai/leetcode-sync@v1.7
         with:
-          python-version: '3.9'
-
-      - name: Install Dependencies
-        run: pip install requests
-
-      - name: Create Sync Script
-        run: |
-          cat > sync_leetcode.py << 'EOF'
-          import os
-          import requests
-          import json
-          import base64
-          from datetime import datetime
-          import time
-
-          def write_file(path, content):
-              os.makedirs(os.path.dirname(path), exist_ok=True)
-              with open(path, 'w', encoding='utf-8') as f:
-                  f.write(content)
-
-          def fetch_page(session, csrf_token, offset, limit):
-              query = """
-              query submissionList($offset: Int!, $limit: Int!) {
-                submissionList(offset: $offset, limit: $limit) {
-                  submissions {
-                    id
-                    title
-                    titleSlug
-                    status
-                    statusDisplay
-                    lang
-                    langName
-                    runtime
-                    timestamp
-                  }
-                }
-              }
-              """
-              headers={
-                  'Content-Type': 'application/json',
-                  'X-CSRFToken': csrf_token,
-                  'Referer': 'https://leetcode.com/',
-                  'User-Agent': 'Mozilla/5.0'
-              }
-              r = session.post('https://leetcode.com/graphql/', json={'query': query, 'variables': {'offset': offset, 'limit': limit}}, headers=headers, timeout=30)
-              if r.status_code != 200:
-                  print(f"Fetch failed (offset={offset}): {r.status_code}")
-                  try:
-                      print('Body:', r.text[:1000])
-                  except Exception:
-                      pass
-                  return []
-              data = r.json()
-              return (data.get('data', {}).get('submissionList', {}).get('submissions', []))
-
-          def get_leetcode_submissions():
-              session = requests.Session()
-              leetcode_session = os.environ.get('LEETCODE_SESSION', '')
-              csrf_token = os.environ.get('LEETCODE_CSRF_TOKEN', '')
-              if not leetcode_session or not csrf_token:
-                  print("Missing LeetCode credentials")
-                  return []
-              session.cookies.set('LEETCODE_SESSION', leetcode_session)
-              session.cookies.set('csrftoken', csrf_token)
-              time.sleep(0.5)
-
-              max_pages = int(os.environ.get('MAX_PAGES', '100'))
-              page_size = int(os.environ.get('PAGE_SIZE', '50'))
-
-              all_subs = []
-              for page in range(max_pages):
-                  offset = page * page_size
-                  print(f"Fetching page {page+1}/{max_pages} (offset={offset}, size={page_size})...")
-                  subs = fetch_page(session, csrf_token, offset, page_size)
-                  if not subs:
-                      print("No more submissions.")
-                      break
-                  all_subs.extend(subs)
-                  time.sleep(0.2)
-              print(f"Total submissions fetched: {len(all_subs)}")
-              return all_subs
-
-          def get_submission_details(submission_id, session_cookies, csrf_token):
-              session = requests.Session()
-              session.cookies.set('LEETCODE_SESSION', session_cookies)
-              session.cookies.set('csrftoken', csrf_token)
-              headers = {
-                  'Content-Type': 'application/json',
-                  'X-CSRFToken': csrf_token,
-                  'Referer': 'https://leetcode.com/'
-              }
-              query = """
-              query submissionDetails($submissionId: Int!) {
-                submissionDetails(submissionId: $submissionId) {
-                  code
-                  question { difficulty }
-                }
-              }
-              """
-              r = session.post('https://leetcode.com/graphql/', json={'query': query, 'variables': {'submissionId': submission_id}}, headers=headers, timeout=30)
-              if r.status_code != 200:
-                  return None
-              data = r.json()
-              return data.get('data', {}).get('submissionDetails')
-
-          def iso8601(ts):
-              return datetime.fromtimestamp(int(ts)).strftime('%Y-%m-%dT%H:%M:%SZ')
-
-          print("Starting LeetCode sync...")
-          submissions = get_leetcode_submissions()
-          if not submissions:
-              print("No submissions found")
-              exit(0)
-
-          processed = 0
-          for sub in submissions:
-              try:
-                  if sub.get('status') == 10:  # Accepted
-                      details = get_submission_details(int(sub['id']), os.environ.get('LEETCODE_SESSION'), os.environ.get('LEETCODE_CSRF_TOKEN'))
-                      if details and details.get('code'):
-                          exts = {'python': '.py','python3': '.py','java': '.java','javascript': '.js','cpp': '.cpp','c': '.c'}
-                          ext = exts.get(sub['lang'].lower(), '.txt')
-                          difficulty = details.get('question', {}).get('difficulty', 'medium').lower()
-                          file_path = f"difficulty/{difficulty}/{sub['titleSlug']}{ext}"
-
-                          header = "\n".join([
-                              f"# {sub['title']}",
-                              f"# Difficulty: {difficulty.title()}",
-                              f"# Language: {sub['langName']}",
-                              f"# Runtime: {sub.get('runtime', 'N/A')}",
-                              f"# Submission Date: {datetime.fromtimestamp(int(sub['timestamp'])).strftime('%Y-%m-%d')}"
-                          ])
-                          content = header + "\n\n" + details['code'] + "\n"
-                          write_file(file_path, content)
-
-                          # stage, commit with backdated author/committer
-                          os.system(f"git add '{file_path}'")
-                          ts_iso = iso8601(sub['timestamp'])
-                          author = os.environ.get('USER_EMAIL', '')
-                          os.environ['GIT_AUTHOR_DATE'] = ts_iso
-                          os.environ['GIT_COMMITTER_DATE'] = ts_iso
-                          os.system(f"git -c user.name='SeyiDan' -c user.email='{author}' commit -m \"Sync submission: {sub['title']} ({ts_iso[:10]})\" || true")
-                          processed += 1
-                          time.sleep(0.1)
-              except Exception as e:
-                  print(f"Error processing {sub.get('title','unknown')}: {e}")
-                  continue
-          print(f"Completed! Created {processed} backdated commits")
-          EOF
-
-      - name: Configure Git identity
-        env:
-          USER_EMAIL: ${{ secrets.USER_EMAIL }}
-        run: |
-          git config --global user.name "SeyiDan"
-          git config --global user.email "${USER_EMAIL}"
-
-      - name: Push commits
-        run: |
-          git status
-          git push origin HEAD:main
-
-      - name: Run sync script (forced backfill)
-        env:
-          USER_EMAIL: ${{ secrets.USER_EMAIL }}
-          LEETCODE_SESSION: ${{ secrets.LEETCODE_SESSION }}
-          LEETCODE_CSRF_TOKEN: ${{ secrets.LEETCODE_CSRF_TOKEN }}
-          MAX_PAGES: 100
-          PAGE_SIZE: 50
-        run: python sync_leetcode.py
+          github-token: ${{ github.token }}
+          leetcode-csrf-token: ${{ secrets.LEETCODE_CSRF_TOKEN }}
+          leetcode-session: ${{ secrets.LEETCODE_SESSION }}
+          destination-folder: my-folder
+          verbose: true
+          commit-header: "[LeetCode Sync]"
