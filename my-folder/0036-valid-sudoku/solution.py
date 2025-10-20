@@ -1,43 +1,82 @@
 class Solution:
     def isValidSudoku(self, board: List[List[str]]) -> bool:
-    # Initialize tracking structures for rows, columns, and 3x3 sub-boxes
-    # Create 9 empty sets for rows
-        rows = []
-        for i in range(9):
-            rows.append(set())
-        
-        # Create 9 empty sets for columns
-        cols = []
-        for i in range(9):
-            cols.append(set())
-        
-        # Create 9 empty sets for 3x3 boxes
-        boxes = []
-        for i in range(9):
-            boxes.append(set())
-        
-        # Iterate through each cell in the board
-        for r in range(9):
-            for c in range(9):
-                # Skip empty cells
-                if board[r][c] == '.':
+        rows = [set() for _ in range(9)]
+        cols = [set() for _ in range(9)]
+        boxes = [set() for _ in range(9)]
+
+        for row in range(9):
+            for col in range(9):
+                num = board[row][col]
+                if num == '.':
                     continue
-                
-                # Get the current value
-                val = board[r][c]
-                
-                # Calculate which 3x3 box we're in
-                box_idx = (r // 3) * 3 + (c // 3)
-                
-                # Check if this value already exists in current row, column, or box
-                if val in rows[r] or val in cols[c] or val in boxes[box_idx]:
+                box_index = (row//3)*3 + (col//3)
+
+                if num in rows[row] or num in cols[col] or num in boxes[box_index]:
                     return False
-                
-                # Add the value to our tracking sets
-                rows[r].add(val)
-                cols[c].add(val)
-                boxes[box_idx].add(val)
-        
-        # If we've made it through the entire board without finding any violations
+
+                rows[row].add(num)
+                cols[col].add(num)
+                boxes[box_index].add(num)
         return True
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#  # THESE LINES ARE STILL NEEDED - sets are initialized here!
+#     rows = [set() for _ in range(9)]
+#     cols = [set() for _ in range(9)]
+#     boxes = [set() for _ in range(9)]
+    
+#     # Then the compressed version:
+#     for row in range(9):
+#         for col in range(9):
+#             num = board[row][col]
+#             if num == '.':
+#                 continue
+                
+#             box_index = (row // 3) * 3 + (col // 3)
+            
+#             # Check all three at once
+#             if num in rows[row] or num in cols[col] or num in boxes[box_index]:
+#                 return False
+                
+#             rows[row].add(num)  # .add() is a SET method!
+#             cols[col].add(num)
+#             boxes[box_index].add(num)
+        
+#         return True
